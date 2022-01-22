@@ -78,7 +78,6 @@ class Block {
       required this.value,
       required this.range,
       this.args = const []});
-
   num calc() {
     var result = num.parse(execute(value));
     return applyMathFunction(result);
