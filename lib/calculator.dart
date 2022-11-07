@@ -1,29 +1,75 @@
 import 'dart:math' as math;
 
+import 'functions.dart';
+
 class Calculator {
-  num calculate(String expression) {
-    var symbolsAndConstants = {
-      "√": "sqrt",
-      "!": "fact",
-      "π": math.pi,
-      "e": math.e,
-    };
-    for (var key in symbolsAndConstants.keys) {
-      expression =
-          expression.replaceAll(key, symbolsAndConstants[key].toString());
+  num? calculate(String expression) {
+    try {
+      expression = expression.replaceAll(' ', '');
+      if (expression.isEmpty) {
+        return 0;
+      }
+      var symbolsAndConstants = {
+        "√": "sqrt",
+        "!": "fact",
+        "pi": math.pi,
+        "π": math.pi,
+        "e": math.e,
+      };
+      if (expression.contains(',')) {
+        expression = expression.replaceAll(',', '.');
+      }
+      for (var key in symbolsAndConstants.keys) {
+        expression =
+            expression.replaceAll(key, symbolsAndConstants[key].toString());
+      }
+      expression = '($expression)';
+      while (expression.contains('(')) {
+        var block = nextSBlock(expression);
+        var result = block.calc();
+        expression = expression.replaceRange(
+            block.range.start, block.range.end, result.toString());
+      }
+      var result = num.parse(expression);
+      return result.toInt() == result ? result.toInt() : result;
+    } catch (e) {
+      return null;
     }
-    expression = '($expression)';
-    while (expression.contains('(')) {
-      var block = nextBlock(expression);
-      var result = block.calc();
-      expression = expression.replaceRange(
-          block.range.start, block.range.end, result.toString());
-    }
-    var result = num.parse(expression);
-    return result.toInt() == result ? result.toInt() : result;
   }
 
-  Block nextBlock(String expression) {
+  String validate(String expression) {
+    try {
+      expression = expression.replaceAll(' ', '');
+      if (expression.isEmpty) {
+        return 0.toString();
+      }
+      var symbols = {
+        "sqrt": "√",
+        "fact": "!",
+        "pi": "π",
+      };
+      // replace with symbols
+      for (var key in symbols.keys) {
+        expression = expression.replaceAll(key, symbols[key].toString());
+      }
+      var chars = expression.split('');
+      for (var i = 0; i < chars.length; i++) {
+        var char = chars[i];
+        if (chars.length > i + 1) {}
+        String? nextChar = chars[i + 1];
+        if (symbols.keys.contains(char) && nextChar != "(") {
+          chars.insert(i + 1, "(");
+        }
+        // return 'Invalid character: $char';
+      }
+      // add brackets after symbols if need and it found
+      return chars.join("");
+    } catch (e) {
+      return expression;
+    }
+  }
+
+  SBlock nextSBlock(String expression) {
     var openBracketIndex = 0;
     var closeBracketIndex = 0;
     var regex = RegExp(r'([A-Za-z]+|)+\(([^()]+)\)');
@@ -35,11 +81,11 @@ class Calculator {
       value = args.first;
       args = args.length > 1 ? args.sublist(1) : [];
     }
-    return Block(
+    return SBlock(
       name: allMatches.first.group(1),
       value: value,
       args: args,
-      range: BlockRange(
+      range: SBlockRange(
         allMatches.first.start,
         allMatches.first.end,
       ),
@@ -47,103 +93,65 @@ class Calculator {
   }
 }
 
-class AdditionalFunctions {
-  static num ln(num a) {
-    return math.log(a);
-  }
-
-  static num fact(num a) {
-    if (a == 0) {
-      return 1;
-    }
-    return a * fact(a - 1);
-  }
-
-  static num mod(num a, num b) {
-    return a % b;
-  }
-
-  static num abs(num a) {
-    return a.abs();
-  }
-}
-
-class Block {
+class SBlock {
   String? name;
   String value;
   List<String?> args;
-  BlockRange range;
-  Block(
-      {this.name,
-      required this.value,
-      required this.range,
-      this.args = const []});
+  SBlockRange range;
+  SBlock({
+    this.name,
+    required this.value,
+    required this.range,
+    this.args = const [],
+  });
   num calc() {
     var result = num.parse(execute(value));
-    return applyMathFunction(result);
+    return AdditionalFunctions.apply(name, result, args);
   }
 
-  num applyMathFunction(num result) {
-    if (name == 'sqrt') {
-      return math.sqrt(result);
-    } else if (name == 'sin') {
-      return math.sin(result);
-    } else if (name == 'cos') {
-      return math.cos(result);
-    } else if (name == 'tan') {
-      return math.tan(result);
-    } else if (name == 'asin') {
-      return math.asin(result);
-    } else if (name == 'acos') {
-      return math.acos(result);
-    } else if (name == 'atan') {
-      return math.atan(result);
-    } else if (name == 'log') {
-      return math.log(result);
-    } else if (name == 'ln') {
-      return math.log(result);
-    } else if (name == 'exp') {
-      return math.exp(result);
-    } else if (name == 'pow') {
-      return math.pow(result, num.parse(args.first!));
-    } else if (name == 'sqr') {
-      return math.pow(result, 2);
-    } else if (name == 'cube') {
-      return math.pow(result, 3);
-    } else if (name == 'cbrt') {
-      return math.pow(result, 1 / 3);
-    } else if (name == 'asin') {
-      return math.asin(result);
-    } else if (name == 'acos') {
-      return math.acos(result);
-    } else if (name == 'atan') {
-      return math.atan(result);
-    } else if (name == 'atan2') {
-      return math.atan2(result, num.parse(args.first!));
-    } else if (name == 'sin') {
-      return math.sin(result);
-    } else if (name == 'cos') {
-      return math.cos(result);
-    } else if (name == 'tan') {
-      return math.tan(result);
-    } else if (name == 'asin') {
-      return math.asin(result);
-    } else if (name == 'acos') {
-      return math.acos(result);
-    } else if (name == 'atan') {
-      return math.atan(result);
-    } else if (name == 'atan2') {
-      return math.atan2(result, num.parse(args.first!));
-    } else if (name == 'mod') {
-      return AdditionalFunctions.mod(result, num.parse(args.first!));
-    } else if (name == 'fact') {
-      return AdditionalFunctions.fact(result);
-    } else if (name == 'abs') {
-      return AdditionalFunctions.abs(result);
-    } else if (name == 'ln') {
-      return AdditionalFunctions.ln(result);
-    }
+  String simplify() {
+    var result = executeS(value);
     return result;
+  }
+
+  String executeS(String expression) {
+    var operators = Operator.operators;
+    if (!expression
+        .split("")
+        .any((element) => operators.keys.contains(element))) {
+      return expression;
+    }
+    List<String> data = [];
+    late var total;
+    for (var operator in operators.keys) {
+      if (expression.contains(operator)) {
+        var _data = expression
+            .split(operator)
+            .map((e) => e == "" ? operators[operator]!.initValue.toString() : e)
+            .toList();
+        var index = 0;
+        for (var _expr in _data) {
+          if (_expr == "") {
+            continue;
+          }
+          if (index == 0) {
+            total = num.parse(executeS(_expr));
+            index++;
+            continue;
+          }
+          for (var _operator in operators.keys) {
+            if (operator == _operator) {
+              total =
+                  operators[_operator]!.calc(total, num.parse(executeS(_expr)));
+              break;
+            }
+          }
+          index++;
+        }
+        expression = total.toString();
+      }
+    }
+    return total.toString();
   }
 
   String execute(String expression) {
@@ -187,10 +195,17 @@ class Block {
   }
 }
 
-class BlockRange {
+class Equation {
+  String equation;
+  Equation({
+    required this.equation,
+  });
+}
+
+class SBlockRange {
   int start;
   int end;
-  BlockRange(this.start, this.end);
+  SBlockRange(this.start, this.end);
 }
 
 abstract class Operator {
