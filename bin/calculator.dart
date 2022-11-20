@@ -2,12 +2,12 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:calculator/functions.dart';
 import 'package:collection/collection.dart';
 
 import 'package:calculator/calculator.dart' as c;
 
 void main(List<String> arguments) {
-  var calculator = c.Calculator();
   stdout.write('Enter expression: ');
   String expression = stdin.readLineSync()!;
   printWarning(Calculator.calculate(expression).toString());
@@ -63,7 +63,9 @@ class Calculator {
     String tmp = "";
     var i = 0;
     while (i < _tokens.length) {
-      if (_tokens[i] == "." || int.tryParse(_tokens[i]) != null) {
+      if (["."].contains(_tokens[i]) ||
+          int.tryParse(_tokens[i]) != null ||
+          RegExp(r'[a-zA-Z]').hasMatch(_tokens[i])) {
         tmp += _tokens[i];
       } else {
         if (tmp != "") {
@@ -123,63 +125,132 @@ class Calculator {
   static calculate(String input) {
     var _preprocessData = preprocess(input);
     var _preprocessParentheseData = preprocessParenthese(_preprocessData);
-    var _blocks = ParentheseBloc.fromList(_preprocessParentheseData);
+    var _blocks = Blocks.fromList(_preprocessParentheseData);
     print(_blocks.toColorStringWithColor());
-    print(calculateBlock(_preprocessParentheseData));
+    print(calculateBlock(_blocks));
+    print(calculateDynamic(_preprocessParentheseData));
+  }
+
+  static num calculateBlock(Block block) {
+    if (block is NumberBloc) {
+      return block.value;
+    } else if (block is Blocks) {
+      if (block.blocks.length == 1) {
+        return calculateBlock(block.blocks[0]);
+      }
+      List<OperatorBloc> exists =
+          block.blocks.whereType<AdditionOperatorBloc>().toList();
+      if (exists.isEmpty) {
+        exists = block.blocks.whereType<SubtractionOperatorBloc>().toList();
+      }
+      if (exists.isEmpty) {
+        exists = block.blocks.whereType<MultiplicationOperatorBloc>().toList();
+      }
+      if (exists.isEmpty) {
+        exists = block.blocks.whereType<DivisionOperatorBloc>().toList();
+      }
+      if (exists.isNotEmpty) {
+        return exists.first.apply(block);
+      }
+      if (block.blocks.first is FunctionBloc) {
+        if (block.blocks.length == 2) {
+          var name = (block.blocks.first as FunctionBloc).name;
+          var args = block.blocks.last as Blocks;
+          var addData = Calculator.splitByType<CommaBloc>(args.blocks);
+
+          return AdditionalFunctions.call(
+              name,
+              addData
+                  .map((e) => calculateBlock(((_block) {
+                        return _block is List
+                            ? Blocks(<Block>[..._block])
+                            : _block;
+                      })(e)))
+                  .toList());
+        }
+      }
+    }
+    return throw Exception("invalid input");
   }
 
   /// culculate single bloc
-  static double? calculateBlock(dynamic preprocessParentheseData) {
+  static num? calculateDynamic(dynamic preprocessParentheseData) {
     if (preprocessParentheseData is! List) {
       return double.parse(preprocessParentheseData);
     }
     if (preprocessParentheseData.length == 1) {
-      return calculateBlock(preprocessParentheseData[0]);
+      return calculateDynamic(preprocessParentheseData[0]);
     } else if (preprocessParentheseData.contains("+")) {
       var addData = splitList(preprocessParentheseData, "+").toList();
-      var addResult = calculateBlock(addData.first)!;
+      var addResult = calculateDynamic(addData.first)!;
       addData.removeAt(0);
       for (var addItem in addData) {
-        addResult = addResult + calculateBlock(addItem)!;
+        addResult = addResult + calculateDynamic(addItem)!;
       }
       return addResult;
     } else if (preprocessParentheseData.contains("-")) {
       var addData = splitList(preprocessParentheseData, "-").toList();
-      var addResult = calculateBlock(addData.first)!;
+      var addResult = calculateDynamic(addData.first)!;
       addData.removeAt(0);
       for (var addItem in addData) {
-        addResult = addResult - calculateBlock(addItem)!;
+        addResult = addResult - calculateDynamic(addItem)!;
       }
       return addResult;
     } else if (preprocessParentheseData.contains("*")) {
       var addData = splitList(preprocessParentheseData, "*").toList();
-      var addResult = calculateBlock(addData.first)!;
+      var addResult = calculateDynamic(addData.first)!;
       addData.removeAt(0);
       for (var addItem in addData) {
-        addResult = addResult * calculateBlock(addItem)!;
+        addResult = addResult * calculateDynamic(addItem)!;
       }
       return addResult;
     } else if (preprocessParentheseData.contains("/")) {
       var addData = splitList(preprocessParentheseData, "/").toList();
-      var addResult = calculateBlock(addData.first)!;
+      var addResult = calculateDynamic(addData.first)!;
       addData.removeAt(0);
       for (var addItem in addData) {
-        addResult = addResult / calculateBlock(addItem)!;
+        addResult = addResult / calculateDynamic(addItem)!;
       }
       return addResult;
     } else if (preprocessParentheseData.contains("^")) {
       var addData = splitList(preprocessParentheseData, "^").toList();
-      var addResult = calculateBlock(addData.first)!;
+      var addResult = calculateDynamic(addData.first)!;
       addData.removeAt(0);
       for (var addItem in addData) {
-        addResult = pow(addResult, calculateBlock(addItem)!).toDouble();
+        addResult = pow(addResult, calculateDynamic(addItem)!).toDouble();
       }
       return addResult;
+    } else if (RegExp(r'[a-zA-Z]').hasMatch(preprocessParentheseData.first)) {
+      if (preprocessParentheseData.length == 2) {
+        var name = preprocessParentheseData.first as String;
+        var args = preprocessParentheseData.last as List;
+        var addData = splitList(args, ",").toList();
+        return AdditionalFunctions.call(
+            name, addData.map((e) => calculateDynamic(e)!).toList());
+      }
+    } else {
+      return throw Exception("invalid input");
     }
   }
 
   static Iterable splitList(List list, by) {
     return list.splitBefore((e) => e == by).mapIndexed((index, element) {
+      var el;
+      if (index > 0) {
+        el = element.sublist(1);
+      } else {
+        el = element;
+      }
+
+      if (el is List && el.length == 1) {
+        return el[0];
+      }
+      return el;
+    });
+  }
+
+  static Iterable splitByType<T>(List list) {
+    return list.splitBefore((e) => e is T).mapIndexed((index, element) {
       var el;
       if (index > 0) {
         el = element.sublist(1);
@@ -226,14 +297,32 @@ class RGBAColor {
 abstract class Block {
   // all clock should have color getter
   RGBAColor? get color => RGBAColor(100, 20, 155, 1);
+  num calculate() =>
+      throw Exception("${runtimeType} doesn't have calculate method");
 
   static Block? fromString(String block) {
-    if (["+", "-", "*", "/", "^"].contains(block)) {
-      return OperatorBloc(block);
+    switch (block) {
+      case "+":
+        return AdditionOperatorBloc();
+      case "-":
+        return SubtractionOperatorBloc();
+      case "*":
+        return MultiplicationOperatorBloc();
+      case "/":
+        return DivisionOperatorBloc();
+    }
+    if (RegExp(r"^[a-zA-Z]+$").hasMatch(block)) {
+      return FunctionBloc(block);
+    }
+    if (block == ",") {
+      return CommaBloc(block);
     }
     var number = double.tryParse(block);
     if (number != null) {
       return NumberBloc(number);
+    }
+    if (block == " ") {
+      return SpaceBloc(block);
     }
   }
 
@@ -246,8 +335,9 @@ abstract class Block {
 }
 
 class NumberBloc extends Block {
+  @override
   RGBAColor? get color => RGBAColor(50, 200, 155, 1);
-  final double value;
+  final num value;
   NumberBloc(this.value);
 
   @override
@@ -263,6 +353,10 @@ class NumberBloc extends Block {
 }
 
 class OperatorBloc extends Block {
+  /// execute operator
+  num execute(num a, num b) =>
+      throw Exception("operator ${runtimeType} doesn't have execute method");
+  @override
   RGBAColor? get color => RGBAColor(80, 2, 255, 1);
   final String operator;
   OperatorBloc(this.operator);
@@ -277,14 +371,147 @@ class OperatorBloc extends Block {
     // use Yellow
     return '\x1B[33m${toString()}\x1B[0m';
   }
+
+  num apply<T>(Blocks block) {
+    var addData = block.blocks
+        .splitBefore((e) => e is OperatorBloc && e.operator == operator)
+        .mapIndexed((index, element) {
+      var el;
+      if (index > 0) {
+        el = element.sublist(1);
+      } else {
+        el = element;
+      }
+
+      if (el is List && el.length == 1) {
+        return el[0];
+      }
+      return el;
+    }).toList();
+    var addResult = Calculator.calculateBlock(((_block) {
+      return _block is List ? Blocks(_block as List<Block>) : _block;
+    })(addData.first));
+    addData.removeAt(0);
+    for (var addItem in addData) {
+      addResult = execute(addResult, Calculator.calculateBlock(addItem));
+    }
+    return addResult;
+  }
 }
 
-class ParentheseBloc extends Block {
+class AdditionOperatorBloc extends OperatorBloc {
+  /// execute operator
+  @override
+  num execute(num a, num b) => a + b;
+  AdditionOperatorBloc() : super("+");
+  @override
+  num apply<AdditionOperatorBloc>(Blocks block) =>
+      super.apply<AdditionOperatorBloc>(block);
+}
+
+class SubtractionOperatorBloc extends OperatorBloc {
+  /// execute
+  @override
+  num execute(num a, num b) => a - b;
+
+  SubtractionOperatorBloc() : super("-");
+  @override
+  num apply<SubtractionOperatorBloc>(Blocks block) =>
+      super.apply<SubtractionOperatorBloc>(block);
+}
+
+class MultiplicationOperatorBloc extends OperatorBloc {
+  /// execute
+  @override
+  num execute(num a, num b) => a * b;
+
+  MultiplicationOperatorBloc() : super("*");
+  @override
+  num apply<MultiplicationOperatorBloc>(Blocks block) =>
+      super.apply<MultiplicationOperatorBloc>(block);
+}
+
+class DivisionOperatorBloc extends OperatorBloc {
+  /// execute
+  @override
+  num execute(num a, num b) => a / b;
+
+  DivisionOperatorBloc() : super("/");
+  @override
+  num apply<DivisionOperatorBloc>(Blocks block) =>
+      super.apply<DivisionOperatorBloc>(block);
+}
+
+class PowerOperatorBloc extends OperatorBloc {
+  @override
+  num execute(num a, num b) => pow(a, b);
+  PowerOperatorBloc() : super("^");
+  @override
+  num apply<PowerOperatorBloc>(Blocks block) =>
+      super.apply<PowerOperatorBloc>(block);
+}
+
+class FunctionBloc extends Block {
+  @override
+  RGBAColor? get color => RGBAColor(15, 10, 130, 1);
+  final String name;
+  FunctionBloc(this.name);
+
+  @override
+  String toString() {
+    return name;
+  }
+
+  @override
+  String toColorString() {
+    // use Yellow
+    return '\x1B[33m${toString()}\x1B[0m';
+  }
+}
+
+class SpaceBloc extends Block {
+  @override
+  RGBAColor? get color => RGBAColor(255, 255, 255, 0);
+  final String value;
+  SpaceBloc(this.value);
+
+  @override
+  String toString() {
+    return value;
+  }
+
+  @override
+  String toColorString() {
+    // use Yellow
+    return '\x1B[33m${toString()}\x1B[0m';
+  }
+}
+
+class CommaBloc extends Block {
+  @override
+  RGBAColor? get color => RGBAColor(8, 22, 60, 1);
+  final String operator;
+  CommaBloc(this.operator);
+
+  @override
+  String toString() {
+    return operator;
+  }
+
+  @override
+  String toColorString() {
+    // use Yellow
+    return '\x1B[33m${toString()}\x1B[0m';
+  }
+}
+
+class Blocks extends Block {
+  @override
   RGBAColor? get color => RGBAColor(255, 15, 155, 1);
   final List<Block> blocks;
-  ParentheseBloc(this.blocks);
+  Blocks(this.blocks);
 
-  static ParentheseBloc fromList(List<dynamic> list) {
+  static Blocks fromList(List<dynamic> list) {
     var _blocks = <Block>[];
     for (var i = 0; i < list.length; i++) {
       var _item = list[i];
@@ -299,7 +526,7 @@ class ParentheseBloc extends Block {
         throw UnimplementedError("that was un expected!");
       }
     }
-    return ParentheseBloc(_blocks);
+    return Blocks(_blocks);
   }
 
   @override
@@ -350,7 +577,9 @@ class Result {
 }
 
 class ExecuteResult extends Result {
+  @override
   final CalculatorVariableType? result;
+  @override
   final String? error;
 
   ExecuteResult({

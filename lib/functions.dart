@@ -20,10 +20,12 @@ class AdditionalFunctions {
     return a.abs();
   }
 
-  static num apply(String? name, num value, List args) {
-    if (name == null) {
-      return value;
-    } else if (name == 'sqrt') {
+  static num call(String? name, List<num> args) {
+    var value;
+    if (args.isNotEmpty) {
+      value = args.first;
+    }
+    if (name == 'sqrt') {
       return math.sqrt(value);
     } else if (name == 'sin') {
       return math.sin(value);
@@ -44,7 +46,7 @@ class AdditionalFunctions {
     } else if (name == 'exp') {
       return math.exp(value);
     } else if (name == 'pow') {
-      return math.pow(value, num.parse(args.first!));
+      return math.pow(value, args[1]);
     } else if (name == 'sqr') {
       return math.pow(value, 2);
     } else if (name == 'cube') {
@@ -58,7 +60,7 @@ class AdditionalFunctions {
     } else if (name == 'atan') {
       return math.atan(value);
     } else if (name == 'atan2') {
-      return math.atan2(value, num.parse(args.first!));
+      return math.atan2(value, args[1]);
     } else if (name == 'sin') {
       return math.sin(value);
     } else if (name == 'cos') {
@@ -72,9 +74,9 @@ class AdditionalFunctions {
     } else if (name == 'atan') {
       return math.atan(value);
     } else if (name == 'atan2') {
-      return math.atan2(value, num.parse(args.first!));
+      return math.atan2(value, args[1]);
     } else if (name == 'mod') {
-      return AdditionalFunctions.mod(value, num.parse(args.first!));
+      return AdditionalFunctions.mod(value, args[1]);
     } else if (name == 'fact') {
       return AdditionalFunctions.fact(value);
     } else if (name == 'abs') {
